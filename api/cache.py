@@ -2,7 +2,7 @@ import os
 import json
 from typing import Dict, Any
 
-CACHE_FILEPATH = "data_cache.json"
+CACHE_FILEPATH = "../data_cache.json"
 
 def load_cache() -> Dict[str, Any]:
     """
