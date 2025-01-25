@@ -4,8 +4,8 @@ from typing import List, Dict
 import requests
 from dotenv import load_dotenv
 
-from utils import is_in_british_columbia_google
-from cache import load_cache, save_cache
+from .utils import is_in_british_columbia_google
+from .cache import load_cache, save_cache
 
 load_dotenv()
 GOOGLE_API_MAPS_KEY = os.getenv("GOOGLE_API_MAPS_KEY")

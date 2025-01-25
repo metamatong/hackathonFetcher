@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from mangum import Mangum
 
-import crawler
-import schemas
+from . import crawler
+from . import schemas
 
 app = FastAPI()
 @app.get("/")

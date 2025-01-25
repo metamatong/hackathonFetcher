@@ -1,5 +1,5 @@
 import requests
-from cache import load_cache, save_cache
+from .cache import load_cache, save_cache
 
 def is_in_british_columbia_google(address: str, api_key: str) -> bool:
     # 1. Load current cache
