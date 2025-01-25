@@ -1,4 +1,5 @@
 import requests
+import re
 from typing import List, Dict
 
 
@@ -59,6 +60,8 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
 
         # Devpost calls the field "prize_amount"
         prize_text = hackathon.get("prize_amount", "")
+        prize_match = re.search(r'[\d,]+', prize_text)
+        prize = prize_match.group(0).replace(",", "") if prize_match else "0"
 
         # For date, Devpost uses "submission_period_dates"
         date_text = hackathon.get("submission_period_dates", "Unknown")
@@ -67,11 +70,9 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
 
         # 1) Check location for "vancouver", "british columbia", or "online"
         loc_lower = location.lower()
-        if ("vancouver" not in loc_lower) and ("british columbia" not in loc_lower) and ("online" not in loc_lower):
-            continue
 
         # 2) Only keep hackathons awarding USD ($) or CAD ($CAD); exclude "₹", "INR"
-        if "₹" in prize_text or "INR" in prize_text:
+        if "₹" in prize_text or "INR" in prize_text or "£" in prize_text:
             continue
 
         # If it passes the filters, add it to the final results
@@ -79,7 +80,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
             "name": name,
             "url": url,
             "location": location,
-            "prize": prize_text,
+            "prize": prize,
             "date": date_text
         })
 
