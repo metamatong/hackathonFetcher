@@ -3,6 +3,9 @@ import crawler
 import schemas
 
 app = FastAPI()
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Vercel!"}
 
 @app.get("/hackathons", response_model=schemas.HackathonResponse)
 def get_hackathons():
