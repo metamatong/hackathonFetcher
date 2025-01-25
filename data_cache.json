@@ -1,0 +1,26 @@
+{
+  "hackathons": {
+    "https://1t-agents.devpost.com/": {
+      "name": "One Trillion Agents Hackathon",
+      "url": "https://1t-agents.devpost.com/",
+      "location": "Online",
+      "prize": "100000",
+      "date": "Jan 31 - Feb 21, 2025"
+    },
+    "https://innohacks-2024-spring.devpost.com/": {
+      "name": "InnoHacks 2025 Spring",
+      "url": "https://innohacks-2024-spring.devpost.com/",
+      "location": "Online",
+      "prize": "220",
+      "date": "Feb 14 - 16, 2025"
+    },
+    "https://pike-labs-hackathon.devpost.com/": {
+      "name": "Pike Labs Hackathon",
+      "url": "https://pike-labs-hackathon.devpost.com/",
+      "location": "Online",
+      "prize": "10000",
+      "date": "Mar 01 - May 30, 2025"
+    }
+  },
+  "locations": {}
+}
