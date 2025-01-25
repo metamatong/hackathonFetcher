@@ -1,7 +1,17 @@
-import requests
+import os
 import re
 from typing import List, Dict
 
+import requests
+from dotenv import load_dotenv
+
+from utils import is_in_british_columbia_google
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Retrieve the API key
+GOOGLE_API_MAPS_KEY = os.getenv("GOOGLE_API_MAPS_KEY")
 
 def fetch_hackathon_data(api_url: str) -> List[Dict]:
     """
@@ -44,43 +54,39 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
     filtered_hackathons = []
 
     for hackathon in hackathon_list:
-        # The API returns fields like:
-        #   "title"
-        #   "url"
-        #   "displayed_location": { "location": "Some city" }
-        #   "prize_amount": e.g. "$<span data-currency-value>1,500</span>"
-        #   "submission_period_dates": e.g. "Jan 26, 2025"
-
         name = hackathon.get("title", "N/A")
         url = hackathon.get("url", "N/A")
 
-        # Pull out location from "displayed_location" sub-dict
-        location_dict = hackathon.get("displayed_location", {})
-        location = location_dict.get("location", "Unknown")
+        loc_dict = hackathon.get("displayed_location", {})
+        location = loc_dict.get("location", "Unknown")
 
-        # Devpost calls the field "prize_amount"
         prize_text = hackathon.get("prize_amount", "")
         prize_match = re.search(r'[\d,]+', prize_text)
-        prize = prize_match.group(0).replace(",", "") if prize_match else "0"
+        prize_num = prize_match.group(0).replace(",", "") if prize_match else "0"
 
-        # For date, Devpost uses "submission_period_dates"
         date_text = hackathon.get("submission_period_dates", "Unknown")
 
-        # --- Filter logic ---
-
-        # 1) Check location for "vancouver", "british columbia", or "online"
-        loc_lower = location.lower()
-
-        # 2) Only keep hackathons awarding USD ($) or CAD ($CAD); exclude "₹", "INR"
-        if "₹" in prize_text or "INR" in prize_text or "£" in prize_text:
+        # skip if the prize text includes currencies we exclude
+        if any(x in prize_text for x in ["₹", "INR", "£"]):
             continue
+
+        # location check:
+        loc_lower = location.lower()
+        # If it's "online" anywhere in the location text, keep it
+        if "online" in loc_lower:
+            # keep
+            pass
+        else:
+            # else we must confirm geocoding => BC, Canada
+            if not is_in_british_columbia_google(location, GOOGLE_API_MAPS_KEY):
+                continue  # skip if not in BC
 
         # If it passes the filters, add it to the final results
         filtered_hackathons.append({
             "name": name,
             "url": url,
             "location": location,
-            "prize": prize,
+            "prize": prize_num,
             "date": date_text
         })
 
