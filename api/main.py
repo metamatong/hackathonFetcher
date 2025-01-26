@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException
-from mangum import Mangum
 
 from . import crawler
 from . import schemas
@@ -20,6 +19,3 @@ def get_hackathons():
         raise HTTPException(status_code=404, detail="No hackathons found or unable to fetch data.")
 
     return {"hackathons": hackathons}
-
-# Create a handler for Vercel
-handler = Mangum(app)
