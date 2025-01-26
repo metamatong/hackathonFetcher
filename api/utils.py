@@ -7,10 +7,6 @@ logger = logging.getLogger(__name__)
 
 def is_in_british_columbia_google(address: str, api_key: str) -> bool:
 
-    if not api_key:
-        logger.error("Google API Maps Key is not set.")
-        return False
-
     # 1. Load current cache
     cache_data = load_cache()
     location_cache = cache_data["locations"]  # e.g., {"Vancouver, BC": True, "Berlin, Germany": False}

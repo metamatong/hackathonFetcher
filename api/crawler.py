@@ -68,6 +68,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
         location = loc_dict.get("location", "Unknown")
 
         prize_text = hackathon.get("prize_amount", "")
+        is_cad = False
         prize_match = re.search(r'[\d,]+', prize_text)
         prize_num = prize_match.group(0).replace(",", "") if prize_match else "0"
 
@@ -77,6 +78,9 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
         if any(x in prize_text for x in ["₹", "INR", "£"]):
             logger.debug(f"Skipping hackathon '{name}' due to excluded currency in prize: {prize_text}")
             continue
+
+        if "CAD" in prize_text:
+            is_cad = True
 
         # location check:
         loc_lower = location.lower()
@@ -93,7 +97,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
             "name": name,
             "url": url,
             "location": location,
-            "prize": prize_num,
+            "prize": "CAD" + prize_num if is_cad else "USD" + prize_num,
             "date": date_text
         }
 
