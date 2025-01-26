@@ -1,26 +1,29 @@
-import os
 import json
-from typing import Dict, Any
+import os
+import logging
 
-CACHE_FILEPATH = "../data_cache.json"
+# Configure logger
+logger = logging.getLogger(__name__)
 
-def load_cache() -> Dict[str, Any]:
-    """
-    Load the JSON cache from disk. If file doesn't exist, return empty.
-    """
-    if not os.path.exists(CACHE_FILEPATH):
+CACHE_FILE = os.getenv("CACHE_FILE", "cache.json")
+
+def load_cache() -> dict:
+    if not os.path.exists(CACHE_FILE):
+        logger.info(f"Cache file '{CACHE_FILE}' not found. Initializing empty cache.")
+        return {"hackathons": {}, "locations": {}}
+    try:
+        with open(CACHE_FILE, "r") as f:
+            cache_data = json.load(f)
+            logger.debug(f"Cache loaded from '{CACHE_FILE}'.")
+            return cache_data
+    except Exception as e:
+        logger.error(f"Error loading cache file '{CACHE_FILE}': {e}", exc_info=True)
         return {"hackathons": {}, "locations": {}}
 
-    with open(CACHE_FILEPATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        # Ensure we have both sub-dicts
-        data.setdefault("hackathons", {})
-        data.setdefault("locations", {})
-        return data
-
-def save_cache(cache_data: Dict[str, Any]) -> None:
-    """
-    Save the given dictionary to JSON on disk.
-    """
-    with open(CACHE_FILEPATH, "w", encoding="utf-8") as f:
-        json.dump(cache_data, f, indent=2)
+def save_cache(cache_data: dict):
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump(cache_data, f, indent=4)
+            logger.debug(f"Cache saved to '{CACHE_FILE}'.")
+    except Exception as e:
+        logger.error(f"Error saving cache to '{CACHE_FILE}': {e}", exc_info=True)

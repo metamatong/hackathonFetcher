@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import List, Dict
@@ -10,6 +11,8 @@ from .cache import load_cache, save_cache
 load_dotenv()
 GOOGLE_API_MAPS_KEY = os.getenv("GOOGLE_API_MAPS_KEY")
 
+# Configure logger
+logger = logging.getLogger(__name__)
 
 def fetch_hackathon_data(api_url: str) -> List[Dict]:
     """
@@ -27,14 +30,22 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
     }
 
     try:
+        logger.debug(f"Making GET request to {api_url} with params {params}")
         response = requests.get(api_url, params=params)
         response.raise_for_status()
+        logger.debug("API request successful.")
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data from API: {e}")
+        logger.error(f"Error fetching data from API: {e}", exc_info=True)
         return []
 
-    data = response.json()
-    hackathon_list = data.get("hackathons", [])
+    try:
+        data = response.json()
+        hackathon_list = data.get("hackathons", [])
+        logger.debug(f"Received {len(hackathon_list)} hackathons from API.")
+    except ValueError as e:
+        logger.error(f"Error parsing JSON response: {e}", exc_info=True)
+        return []
+
 
     # === Load cache (for hackathons & locations) ===
     cache_data = load_cache()
@@ -49,7 +60,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
         # If we've already seen this hackathon in cache, skip the heavy checks
         # Or decide if you want to re-check location. For demonstration, we’ll skip if in cache.
         if url in hackathon_cache:
-            # Optionally, we can re-add it to filtered results if it was valid
+            logger.debug(f"Hackathon '{name}' found in cache.")
             filtered_hackathons.append(hackathon_cache[url])
             continue
 
@@ -64,16 +75,17 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
 
         # skip if the prize text includes currencies we exclude
         if any(x in prize_text for x in ["₹", "INR", "£"]):
+            logger.debug(f"Skipping hackathon '{name}' due to excluded currency in prize: {prize_text}")
             continue
 
         # location check:
         loc_lower = location.lower()
         if "online" in loc_lower:
-            # keep
-            pass
+            logger.debug(f"Hackathon '{name}' is online.")
         else:
             # else we must confirm geocoding => BC, Canada
             if not is_in_british_columbia_google(location, GOOGLE_API_MAPS_KEY):
+                logger.debug(f"Hackathon '{name}' is not in British Columbia. Skipping.")
                 continue  # skip if not in BC
 
         # If it passes the filters, construct the dictionary
@@ -89,8 +101,10 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
         hackathon_cache[url] = hackathon_dict
 
         filtered_hackathons.append(hackathon_dict)
+        logger.debug(f"Hackathon '{name}' added to filtered list.")
 
     # Persist the updated cache
     save_cache(cache_data)
+    logger.info(f"Total filtered hackathons: {len(filtered_hackathons)}")
 
     return filtered_hackathons

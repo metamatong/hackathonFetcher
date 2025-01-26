@@ -1,7 +1,5 @@
-# app/schemas.py
-
-from pydantic import BaseModel
 from typing import List
+from pydantic import BaseModel
 
 class Hackathon(BaseModel):
     name: str
