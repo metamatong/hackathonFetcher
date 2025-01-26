@@ -4,6 +4,7 @@ import re
 from typing import List, Dict
 import requests
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup  # For parsing HTML content
 
 from .utils import is_in_british_columbia_google
 from .cache import load_cache, save_cache
@@ -13,14 +14,20 @@ GOOGLE_API_MAPS_KEY = os.getenv("GOOGLE_API_MAPS_KEY")
 
 # Configure logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG for detailed logs
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 def fetch_hackathon_data(api_url: str) -> List[Dict]:
     """
     Fetches hackathon data from Devpost's API endpoint, returning only hackathons
     that match certain filters:
-      - upcoming + recently added,
-      - located in Vancouver/BC/Online,
-      - awarding USD or CAD only (exclude hackathons with INR/₹, etc.).
+      - Upcoming + recently added
+      - Located in Vancouver/BC/Online
+      - Awarding USD or CAD only (exclude hackathons with INR/₹, GBP/£, etc.)
+      - Prize amount greater than zero
     """
     # Control query params
     params = {
@@ -46,69 +53,93 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
         logger.error(f"Error parsing JSON response: {e}", exc_info=True)
         return []
 
-
     # === Load cache (for hackathons & locations) ===
     cache_data = load_cache()
-    hackathon_cache = cache_data["hackathons"]  # e.g. { "https://devpost.com/hackathons/XYZ": {...} }
+    hackathon_cache = cache_data.get("hackathons", {})  # Safely get "hackathons" key
 
     filtered_hackathons = []
 
+    # Define currency symbol to code mapping
+    symbol_to_currency = {
+        '$': 'USD',
+        'CAD': 'CAD',  # Assuming 'CAD' might appear as 'CAD' in prize_text
+        # Add more mappings if needed
+    }
+
     for hackathon in hackathon_list:
-        name = hackathon.get("title", "N/A")
+        title = hackathon.get("title", "N/A")
         url = hackathon.get("url", "N/A")
 
-        # If we've already seen this hackathon in cache, skip the heavy checks
-        # Or decide if you want to re-check location. For demonstration, we’ll skip if in cache.
+        # **Skip hackathons already in cache**
         if url in hackathon_cache:
-            logger.debug(f"Hackathon '{name}' found in cache.")
-            filtered_hackathons.append(hackathon_cache[url])
+            logger.debug(f"Skipping hackathon '{title}' as it is already in cache.")
+            continue  # Skip to the next hackathon
+
+        displayed_location = hackathon.get("displayed_location", {})
+        location = displayed_location.get("location", "Unknown")
+
+        prize_html = hackathon.get("prize_amount", "")
+        submission_period_dates = hackathon.get("submission_period_dates", "Unknown")
+
+        # Parse prize_amount to extract currency symbol and amount
+        soup = BeautifulSoup(prize_html, 'html.parser')
+        prize_text = soup.get_text(strip=True)  # E.g., "₹180,000" or "$20,000"
+
+        if not prize_text:
+            logger.debug(f"Hackathon '{title}' has no prize amount. Skipping.")
             continue
 
-        loc_dict = hackathon.get("displayed_location", {})
-        location = loc_dict.get("location", "Unknown")
+        # Extract currency symbol and numeric value
+        # Assuming the first character is the currency symbol
+        currency_symbol = prize_text[0]
+        prize_amount_str = prize_text[1:].replace(',', '')  # Remove commas
+        prize_amount = int(prize_amount_str) if prize_amount_str.isdigit() else 0
 
-        prize_text = hackathon.get("prize_amount", "")
-        is_cad = False
-        prize_match = re.search(r'[\d,]+', prize_text)
-        prize_num = prize_match.group(0).replace(",", "") if prize_match else "0"
-
-        date_text = hackathon.get("submission_period_dates", "Unknown")
-
-        # skip if the prize text includes currencies we exclude
-        if any(x in prize_text for x in ["₹", "INR", "£"]):
-            logger.debug(f"Skipping hackathon '{name}' due to excluded currency in prize: {prize_text}")
+        # **Skip hackathons with excluded currencies**
+        if currency_symbol not in symbol_to_currency:
+            logger.debug(f"Skipping hackathon '{title}' due to excluded currency symbol: {currency_symbol}")
             continue
 
-        if "CAD" in prize_text:
-            is_cad = True
+        # **Skip hackathons with zero prize amount**
+        if prize_amount == 0:
+            logger.debug(f"Skipping hackathon '{title}' because prize amount is zero.")
+            continue
 
-        # location check:
+        # Determine the currency code
+        currency_code = symbol_to_currency.get(currency_symbol, None)
+        if not currency_code:
+            logger.debug(f"Currency symbol '{currency_symbol}' not mapped to any currency code.")
+            continue
+
+        # Location check:
         loc_lower = location.lower()
         if "online" in loc_lower:
-            logger.debug(f"Hackathon '{name}' is online.")
+            logger.debug(f"Hackathon '{title}' is online.")
         else:
-            # else we must confirm geocoding => BC, Canada
+            # Confirm geocoding => BC, Canada
             if not is_in_british_columbia_google(location, GOOGLE_API_MAPS_KEY):
-                logger.debug(f"Hackathon '{name}' is not in British Columbia. Skipping.")
-                continue  # skip if not in BC
+                logger.debug(f"Hackathon '{title}' is not in British Columbia. Skipping.")
+                continue  # Skip if not in BC
 
         # If it passes the filters, construct the dictionary
         hackathon_dict = {
-            "name": name,
+            "name": title,
             "url": url,
             "location": location,
-            "prize": "CAD" + prize_num if is_cad else "USD" + prize_num,
-            "date": date_text
+            "prize": f"{currency_code}{prize_amount}",
+            "date": submission_period_dates
         }
 
-        # Save to the hackathon cache
+        # **Save to the hackathon cache**
         hackathon_cache[url] = hackathon_dict
 
+        # **Append to filtered_hackathons**
         filtered_hackathons.append(hackathon_dict)
-        logger.debug(f"Hackathon '{name}' added to filtered list.")
+        logger.debug(f"Hackathon '{title}' added to filtered list with prize {hackathon_dict['prize']}.")
 
-    # Persist the updated cache
+    # **Persist the updated cache**
+    cache_data["hackathons"] = hackathon_cache
     save_cache(cache_data)
-    logger.info(f"Total filtered hackathons: {len(filtered_hackathons)}")
+    logger.info(f"Total new filtered hackathons: {len(filtered_hackathons)}")
 
     return filtered_hackathons
