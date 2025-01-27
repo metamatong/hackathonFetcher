@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from typing import List, Dict
 import requests
 from dotenv import load_dotenv
