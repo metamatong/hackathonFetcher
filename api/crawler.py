@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from typing import List, Dict
+import re
 
 import aiohttp
 import requests
@@ -42,7 +43,6 @@ async def fetch_hackathon_detail(session: aiohttp.ClientSession, url: str) -> st
         logger.error(f"Error fetching detail page for {url}: {e}", exc_info=True)
         return ""
 
-
 def parse_hackathon_details(html_content: str) -> Dict:
     """
     Parses the hackathon detail page to extract additional information
@@ -51,14 +51,22 @@ def parse_hackathon_details(html_content: str) -> Dict:
     soup = BeautifulSoup(html_content, 'html.parser')
     details = {}
 
-    eligibility_items_text = [
-        item.get_text(strip=True).lower()
-        for item in soup.select('#eligibility-list li')
-    ]
-    details["eligibility_items"] = eligibility_items_text
+    eligibility_elements = soup.select('#eligibility-list li')
+    if not eligibility_elements:
+        logger.warning("No eligibility information found.")
+        details["eligibility_items"] = []
+    else:
+        eligibility_items_text = [
+            item.get_text(strip=True).lower()
+            for item in eligibility_elements
+        ]
+        details["eligibility_items"] = eligibility_items_text
+        logger.debug(f"Parsed eligibility items: {eligibility_items_text}")
 
-    # Then to check "us only":
-    details["US only"] = any("US only" in entry for entry in eligibility_items_text)
+        # Use regex for flexible matching
+        us_only_pattern = re.compile(r'\bus\s*only\b', re.IGNORECASE)
+        details["US only"] = any(us_only_pattern.search(entry) for entry in eligibility_items_text)
+        logger.debug(f"US only flag set to: {details['US only']}")
 
     return details
 
@@ -93,7 +101,7 @@ def is_target_audience(eligibility_items: List[str]) -> bool:
     Returns True if suitable, False otherwise.
     """
     # Define keywords that indicate non-target audiences
-    excluded_keywords = ['Ages 13 to 18 only']
+    excluded_keywords = ['ages 13 to 18 only']  # Changed to lowercase
 
     for keyword in excluded_keywords:
         if any(keyword in item for item in eligibility_items):
@@ -189,11 +197,6 @@ def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
             logger.debug(f"Skipping hackathon '{title}' due to excluded currency symbol: {currency_symbol}")
             continue
 
-        # **Skip hackathons with zero prize amount**
-        if prize_amount == 0:
-            logger.debug(f"Skipping hackathon '{title}' because prize amount is zero.")
-            continue
-
         # Determine the currency code
         currency_code = SYMBOL_TO_CURRENCY.get(currency_symbol, None)
         if not currency_code:
@@ -230,12 +233,16 @@ def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
         detailed_info = loop.run_until_complete(fetch_all_hackathon_details(filtered_hackathons))
         loop.close()
 
+        logger.debug(f"Fetched detailed information for {len(detailed_info)} hackathons.")
+
         # **Filter based on detailed eligibility**
         final_filtered_hackathons = []
         for hackathon in filtered_hackathons:
             url = hackathon['url']
             details = detailed_info.get(url, {})
+            logger.debug(f"details: {details}")
 
+            logger.debug(f"Applying eligibility filters for hackathon: {hackathon['name']}")
             # 1) Skip if "US only" is detected
             if details.get("US only", False):
                 logger.debug(f"Hackathon '{hackathon['name']}' is US-only. Excluding.")
@@ -252,6 +259,7 @@ def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
             final_filtered_hackathons.append(hackathon)
             logger.debug(f"Hackathon '{hackathon['name']}' added to final filtered list.")
 
+        logger.debug(f"Final filtered hackathons count: {len(final_filtered_hackathons)}")
         # **Persist the updated cache**
         cache_data["hackathons"] = hackathon_cache
         save_cache(cache_data)
