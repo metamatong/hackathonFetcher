@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 API_KEY = os.getenv("API_KEY")
 
 app = FastAPI()
+
 @app.get("/")
 async def root():
     logger.info("Root endpoint accessed")
@@ -32,11 +33,10 @@ def get_hackathons(x_api_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     DEVPOST_API_BASE = "https://devpost.com/api/hackathons"
-    url = f"{DEVPOST_API_BASE}?order_by=recently-added&status[]=upcoming&page=1"
 
-    logger.info(f"Fetching hackathons from URL: {url}")
+    logger.info(f"Fetching hackathons from Devpost API.")
 
-    hackathons = crawler.fetch_hackathon_data(url)
+    hackathons = crawler.fetch_hackathon_data(DEVPOST_API_BASE, num_pages=2)
 
     if not hackathons:
         logger.warning("No hackathons found or unable to fetch data.")

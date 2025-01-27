@@ -27,6 +27,7 @@ SYMBOL_TO_CURRENCY = {
     'CAD': 'CAD',
 }
 
+
 async def fetch_hackathon_detail(session: aiohttp.ClientSession, url: str) -> str:
     """
     Asynchronously fetches the HTML content of a hackathon's detail page.
@@ -40,6 +41,7 @@ async def fetch_hackathon_detail(session: aiohttp.ClientSession, url: str) -> st
     except aiohttp.ClientError as e:
         logger.error(f"Error fetching detail page for {url}: {e}", exc_info=True)
         return ""
+
 
 def parse_hackathon_details(html_content: str) -> Dict:
     """
@@ -56,9 +58,10 @@ def parse_hackathon_details(html_content: str) -> Dict:
     details["eligibility_items"] = eligibility_items_text
 
     # Then to check "us only":
-    details["us_only"] = any("us only" in entry for entry in eligibility_items_text)
+    details["US only"] = any("US only" in entry for entry in eligibility_items_text)
 
     return details
+
 
 async def fetch_all_hackathon_details(hackathons: List[Dict]) -> Dict[str, Dict]:
     """
@@ -83,7 +86,8 @@ async def fetch_all_hackathon_details(hackathons: List[Dict]) -> Dict[str, Dict]
 
     return detailed_info
 
-def is_target_audience(eligibility: str) -> bool:
+
+def is_target_audience(eligibility_items: List[str]) -> bool:
     """
     Determines if the hackathon is suitable for the target audience based on eligibility criteria.
     Returns True if suitable, False otherwise.
@@ -92,43 +96,57 @@ def is_target_audience(eligibility: str) -> bool:
     excluded_keywords = ['Ages 13 to 18 only']
 
     for keyword in excluded_keywords:
-        if keyword in eligibility:
+        if any(keyword in item for item in eligibility_items):
             logger.debug(f"Eligibility contains excluded keyword: '{keyword}'")
             return False
     return True
 
-def fetch_hackathon_data(api_url: str) -> List[Dict]:
+
+def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
     """
     Fetches hackathon data from Devpost's API endpoint, returning only hackathons
-    that match certain filters:
+    that match certain filters across multiple pages:
       - Upcoming + recently added
       - Located in Vancouver/BC/Online
       - Awarding USD or CAD only (exclude hackathons with INR/₹, GBP/£, etc.)
       - Prize amount greater than zero
       - Suitable for target audience (e.g., not exclusively for high schoolers)
+
+    Args:
+        api_base_url (str): The base URL for the Devpost hackathons API.
+        num_pages (int): Number of pages to fetch. Default is 2.
+
+    Returns:
+        List[Dict]: A list of filtered hackathons.
     """
-    # Control query params
-    params = {
-        "order_by": "recently-added",
-        "status[]": "upcoming",
-        "page": 1,
-    }
+    all_hackathons = []
 
-    try:
-        logger.debug(f"Making GET request to {api_url} with params {params}")
-        response = requests.get(api_url, params=params)
-        response.raise_for_status()
-        logger.debug("API request successful.")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching data from API: {e}", exc_info=True)
-        return []
+    for page in range(1, num_pages + 1):
+        params = {
+            "order_by": "recently-added",
+            "status[]": "upcoming",
+            "page": page,
+        }
+        try:
+            logger.debug(f"Making GET request to {api_base_url} with params {params}")
+            response = requests.get(api_base_url, params=params)
+            response.raise_for_status()
+            logger.debug(f"API request successful for page {page}.")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching data from API on page {page}: {e}", exc_info=True)
+            continue  # Proceed to the next page
 
-    try:
-        data = response.json()
-        hackathon_list = data.get("hackathons", [])
-        logger.debug(f"Received {len(hackathon_list)} hackathons from API.")
-    except ValueError as e:
-        logger.error(f"Error parsing JSON response: {e}", exc_info=True)
+        try:
+            data = response.json()
+            hackathon_list = data.get("hackathons", [])
+            logger.debug(f"Received {len(hackathon_list)} hackathons from API on page {page}.")
+            all_hackathons.extend(hackathon_list)
+        except ValueError as e:
+            logger.error(f"Error parsing JSON response on page {page}: {e}", exc_info=True)
+            continue  # Proceed to the next page
+
+    if not all_hackathons:
+        logger.warning("No hackathons found across the specified pages.")
         return []
 
     # === Load cache (for hackathons & locations) ===
@@ -137,7 +155,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
 
     filtered_hackathons = []
 
-    for hackathon in hackathon_list:
+    for hackathon in all_hackathons:
         title = hackathon.get("title", "N/A")
         url = hackathon.get("url", "N/A")
 
@@ -197,7 +215,7 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
             "name": title,
             "url": url,
             "location": location,
-            "prize": f"{currency_code}{prize_amount}",
+            "prize": f"{currency_code} {prize_amount:,}",
             "date": submission_period_dates
         }
 
@@ -219,13 +237,13 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
             details = detailed_info.get(url, {})
 
             # 1) Skip if "US only" is detected
-            if details.get("us_only", False):
+            if details.get("US only", False):
                 logger.debug(f"Hackathon '{hackathon['name']}' is US-only. Excluding.")
                 continue
 
             # 2) If you also want to skip if it’s only for high/middle schoolers,
-            eligibility = details.get('eligibility', "")
-            if not is_target_audience(eligibility):
+            eligibility_items = details.get('eligibility_items', [])
+            if not is_target_audience(eligibility_items):
                 logger.debug(f"Hackathon '{hackathon['name']}' excluded based on eligibility (e.g. high school).")
                 continue
 
@@ -243,4 +261,3 @@ def fetch_hackathon_data(api_url: str) -> List[Dict]:
     else:
         logger.info("No new hackathons passed the initial filters.")
         return []
-
