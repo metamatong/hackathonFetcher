@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Header
 import logging
+import os
 from fastapi.responses import JSONResponse
 
 from . import crawler
@@ -16,6 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+API_KEY = os.getenv("API_KEY")
 
 app = FastAPI()
 @app.get("/")
@@ -24,7 +26,11 @@ async def root():
     return {"message": "Welcome to Vercel!"}
 
 @app.get("/hackathons", response_model=schemas.HackathonResponse)
-def get_hackathons():
+def get_hackathons(x_api_key: str = Header(None)):
+    if x_api_key != API_KEY:
+        logger.warning("Unauthorized access attempt detected.")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     DEVPOST_API_BASE = "https://devpost.com/api/hackathons"
     url = f"{DEVPOST_API_BASE}?order_by=recently-added&status[]=upcoming&page=1"
 
