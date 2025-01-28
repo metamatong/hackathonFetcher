@@ -40,7 +40,6 @@ def get_hackathons(x_api_key: str = Header(None)):
 
     if not hackathons:
         logger.warning("No hackathons found or unable to fetch data.")
-        raise HTTPException(status_code=404, detail="No hackathons found or unable to fetch data.")
 
     logger.info(f"Fetched {len(hackathons)} hackathons successfully.")
     return {"hackathons": hackathons}
