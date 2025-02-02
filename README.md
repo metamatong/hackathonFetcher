@@ -16,7 +16,7 @@ Welcome to the **Hackathon Crawler API**! This project is a web crawler built wi
   - **Status**: Retrieves only upcoming and recently added hackathons.
   - **Location**: Filters hackathons located in Vancouver, British Columbia (BC), or online.
   - **Prize Currency**: Includes hackathons awarding prizes in USD or CAD only, excluding others like INR or GBP.
-- **Caching Mechanism**: Implements in-memory caching to avoid redundant API calls and improve performance.
+- **Caching Mechanism**: Implements Redis provided by UpStash to avoid redundant API calls and improve performance.
 - **Geocoding Verification**: Uses Google Maps API to confirm hackathon locations within British Columbia.
 - **Environment Configuration**: Manages sensitive information like API keys using environment variables.
 - **Error Handling**: Robust error management to handle API request failures and data parsing issues gracefully.
