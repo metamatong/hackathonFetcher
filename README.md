@@ -28,7 +28,7 @@ Welcome to the **Hackathon Crawler API**! This project is a web crawler built wi
 - **Programming Language**: Python 3.8+
 - **Web Framework**: FastAPI
 - **HTTP Requests**: Requests
-- **Caching**: Custom in-memory caching
+- **Caching**: UpStash Redis
 - **Environment Management**: python-dotenv
 - **Server**: Uvicorn
 - **Others**: Pydantic for data validation, Logging for monitoring
