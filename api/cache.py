@@ -1,9 +1,12 @@
-# cache.py
-
-import os
-from upstash_redis import Redis
 import json
 import logging
+import os
+
+from dotenv import load_dotenv
+from upstash_redis import Redis
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
