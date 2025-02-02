@@ -1,21 +1,27 @@
 # cache.py
 
 import os
-import redis
+from upstash_redis import Redis
 import json
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Get the Upstash Redis URL from environment variables
-UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_URL")
-if not UPSTASH_REDIS_URL:
-    logger.error("UPSTASH_REDIS_URL environment variable not set.")
-    raise Exception("UPSTASH_REDIS_URL not set.")
+CACHE_KV_REST_API_URL = os.getenv("CACHE_KV_REST_API_URL")
+CACHE_KV_REST_API_TOKEN = os.getenv("CACHE_KV_REST_API_TOKEN")
+
+if not CACHE_KV_REST_API_URL:
+    logger.error("CACHE_KV_REST_API_URL environment variable not set.")
+    raise Exception("CACHE_KV_REST_API_URL not set.")
+
+if not CACHE_KV_REST_API_TOKEN:
+    logger.error("CACHE_KV_REST_API_TOKEN environment variable not set.")
+    raise Exception("CACHE_KV_REST_API_TOKEN not set.")
 
 # Create a Redis client instance.
 # decode_responses=True tells the client to return Python strings (not bytes)
-redis_client = redis.from_url(UPSTASH_REDIS_URL, decode_responses=True)
+redis_client = Redis(url=CACHE_KV_REST_API_URL, token=CACHE_KV_REST_API_TOKEN)
 
 
 def load_cache() -> dict:
