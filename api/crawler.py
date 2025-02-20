@@ -132,7 +132,7 @@ def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
     for page in range(1, num_pages + 1):
         params = {
             "order_by": "recently-added",
-            "status[]": "upcoming",
+            "status[]": ["upcoming", "open"],
             "page": page,
         }
         try:
