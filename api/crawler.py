@@ -114,7 +114,7 @@ def fetch_hackathon_data(api_base_url: str, num_pages: int = 2) -> List[Dict]:
     """
     Fetches hackathon data from Devpost's API endpoint, returning only hackathons
     that match certain filters across multiple pages:
-      - Upcoming + recently added
+      - Upcoming/Open + recently added
       - Located in Vancouver/BC/Online
       - Awarding USD or CAD only (exclude hackathons with INR/₹, GBP/£, etc.)
       - Prize amount greater than zero
